@@ -16,8 +16,7 @@ const store = admin.firestore();
 const db = new Db(store);
 
 exports.log = functions.https.onRequest(async (request, response) => {
-  const text = await handleMessage(request.body as WebhookPayload);
-  response.send(text);
+  await handleMessage(request.body as WebhookPayload, response);
 });
 
 exports.onMessageUpdate = functions.firestore.document('messages/{messageId}').onWrite(async (change, context) => {
@@ -38,7 +37,7 @@ exports.onTaskCreate = functions.firestore.document('tasks/{taskId}').onCreate(a
   }
 });
 
-async function handleMessage(data: WebhookPayload) {
+async function handleMessage(data: WebhookPayload, response: functions.Response) {
   const message: Message = {
     ...data,
     date_id: currentDateId(5),
@@ -46,18 +45,19 @@ async function handleMessage(data: WebhookPayload) {
   }
   const command = new Command(message.text);
   if (command.is('refresh')) {
+    response.send('Refreshing EOD text...');
     await store.collection('tasks').add(refreshTaskData(message));
-    return 'Refreshing EOD text...';
   } else if(command.is('list')) {
+    response.send('Finding your EODs...');
     await store.collection('tasks').add(listTaskData(message));
-      return 'Finding your EODs...';
   } else {
     console.time('messages.add');
+
+    response.send('Logging your EOD')
     await store.collection('messages')
       .doc(`${message.team_id}_${message.user_id}_${message.date_id}`)
       .set(message);
     console.timeEnd('messages.add');
-    return 'Logging your EOD...';
   }
 }
 
